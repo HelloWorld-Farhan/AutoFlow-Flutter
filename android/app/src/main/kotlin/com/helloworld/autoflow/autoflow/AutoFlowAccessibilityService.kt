@@ -522,36 +522,148 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         return true
     }
 
+    private fun getAllNodes(root: AccessibilityNodeInfo): List<AccessibilityNodeInfo> {
+        val list = mutableListOf<AccessibilityNodeInfo>()
+        val queue = java.util.ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        while (queue.isNotEmpty()) {
+            val node = queue.poll() ?: continue
+            list.add(node)
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it) }
+            }
+        }
+        return list
+    }
+
+    private fun clickNode(node: AccessibilityNodeInfo?): Boolean {
+        var current = node
+        while (current != null) {
+            if (current.isClickable) {
+                current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                return true
+            }
+            current = current.parent
+        }
+        return false
+    }
+
     private fun handleInstagramAutomation(rootNode: AccessibilityNodeInfo) {
-        // High level Instagram logic
         when (automationStep) {
             1 -> {
                 val dmIcon = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_button")
                 if (dmIcon.isNotEmpty()) {
-                    dmIcon[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    automationStep = 2
+                    if (clickNode(dmIcon[0])) automationStep = 2
+                    return
+                }
+                val dmFallback = getAllNodes(rootNode).find { it.contentDescription?.contains("Messaging", ignoreCase = true) == true || it.contentDescription?.contains("Direct", ignoreCase = true) == true }
+                if (dmFallback != null) {
+                    if (clickNode(dmFallback)) automationStep = 2
                 }
             }
-            // Add subsequent IG steps here...
             2 -> {
-                finishAutomation()
+                val editTexts = getAllNodes(rootNode).filter { it.className?.contains("EditText") == true }
+                if (editTexts.isNotEmpty()) {
+                    val arguments = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetContact) }
+                    editTexts[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                    automationStep = 3
+                } else {
+                     val searchBtns = getAllNodes(rootNode).filter { it.text?.contains("Search", ignoreCase=true) == true || it.contentDescription?.contains("Search", ignoreCase=true) == true }
+                     if (searchBtns.isNotEmpty()) {
+                         clickNode(searchBtns[0])
+                     }
+                }
+            }
+            3 -> {
+                val contactNodes = rootNode.findAccessibilityNodeInfosByText(targetContact)
+                if (contactNodes.isNotEmpty()) {
+                    // Try to avoid clicking the search bar text we just entered
+                    val validContact = contactNodes.find { !(it.className?.contains("EditText") ?: false) }
+                    if (validContact != null && clickNode(validContact)) {
+                        automationStep = 4
+                    }
+                }
+            }
+            4 -> {
+                val editTexts = getAllNodes(rootNode).filter { it.className?.contains("EditText") == true }
+                if (editTexts.isNotEmpty()) {
+                    val arguments = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, messagePayload) }
+                    editTexts[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                    automationStep = 5
+                }
+            }
+            5 -> {
+                val sendBtns = getAllNodes(rootNode).filter { it.text?.toString()?.equals("Send", ignoreCase=true) == true || it.contentDescription?.toString()?.equals("Send", ignoreCase=true) == true }
+                if (sendBtns.isNotEmpty()) {
+                    if (clickNode(sendBtns[0])) {
+                        automationStep = 6
+                        finishAutomation()
+                    }
+                } else {
+                     val sendIcon = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/row_thread_composer_button_send")
+                     if (sendIcon.isNotEmpty()) {
+                         clickNode(sendIcon[0])
+                         automationStep = 6
+                         finishAutomation()
+                     }
+                }
             }
         }
     }
 
     private fun handleSnapchatAutomation(rootNode: AccessibilityNodeInfo) {
-        // High level Snapchat logic
         when (automationStep) {
             1 -> {
-                val cameraButton = rootNode.findAccessibilityNodeInfosByViewId("com.snapchat.android:id/camera_capture_button")
-                if (cameraButton.isNotEmpty()) {
-                    cameraButton[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    automationStep = 2
+                val chatTab = getAllNodes(rootNode).find { it.contentDescription?.contains("Chat", ignoreCase = true) == true || it.text?.contains("Chat", ignoreCase = true) == true }
+                if (chatTab != null) {
+                    if (clickNode(chatTab)) automationStep = 2
+                } else {
+                    // Fallback to swipe to chats? Often snapchat has a chat button at the bottom
+                    val navButtons = rootNode.findAccessibilityNodeInfosByViewId("com.snapchat.android:id/hova_header_chat_icon")
+                    if (navButtons.isNotEmpty()) {
+                        clickNode(navButtons[0])
+                        automationStep = 2
+                    }
                 }
             }
-            // Add subsequent Snap steps here...
             2 -> {
-                finishAutomation()
+                val searchBtn = rootNode.findAccessibilityNodeInfosByViewId("com.snapchat.android:id/search_icon")
+                if (searchBtn.isNotEmpty() && clickNode(searchBtn[0])) {
+                    // do nothing wait for edittext
+                }
+                
+                val editTexts = getAllNodes(rootNode).filter { it.className?.contains("EditText") == true }
+                if (editTexts.isNotEmpty()) {
+                    val arguments = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetContact) }
+                    editTexts[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                    automationStep = 3
+                }
+            }
+            3 -> {
+                val contactNodes = rootNode.findAccessibilityNodeInfosByText(targetContact)
+                if (contactNodes.isNotEmpty()) {
+                    val validContact = contactNodes.find { !(it.className?.contains("EditText") ?: false) }
+                    if (validContact != null && clickNode(validContact)) {
+                        automationStep = 4
+                    }
+                }
+            }
+            4 -> {
+                val editTexts = getAllNodes(rootNode).filter { it.className?.contains("EditText") == true }
+                if (editTexts.isNotEmpty()) {
+                    val arguments = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, messagePayload) }
+                    editTexts[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                    automationStep = 5
+                }
+            }
+            5 -> {
+                val sendBtns = getAllNodes(rootNode).filter { it.text?.toString()?.equals("Send", ignoreCase=true) == true || it.contentDescription?.toString()?.equals("Send", ignoreCase=true) == true || it.contentDescription?.contains("send", ignoreCase=true) == true }
+                if (sendBtns.isNotEmpty()) {
+                    if (clickNode(sendBtns[0])) {
+                        automationStep = 6
+                        finishAutomation()
+                    }
+                }
             }
         }
     }
