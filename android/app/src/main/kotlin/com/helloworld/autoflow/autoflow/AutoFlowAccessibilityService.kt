@@ -309,12 +309,56 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             for (node in nodes) {
                 val text = node.text?.toString()
                 if (!text.isNullOrEmpty() && !isBadKeyword(text)) {
-                    Log.d(TAG, "[Header] Contact from conversation header: $text")
+                    Log.d(TAG, "[Header] Contact from conversation header ID ($id): $text")
                     return sendContactBack(text)
                 }
             }
         }
+
+        // Smart Heuristic Fallback: If we couldn't find the exact ID (e.g. Insta/Snap updated their UI),
+        // check if this is definitively a chat screen (has a message input).
+        // If it is, the FIRST valid text on the screen (top-left) is almost always the contact's name!
+        if (isChatScreen(root)) {
+            val name = findFirstValidText(root)
+            if (name != null) {
+                Log.d(TAG, "[Header] Contact from heuristic top-text: $name")
+                return sendContactBack(name)
+            }
+        }
+
         return false
+    }
+
+    private fun isChatScreen(root: AccessibilityNodeInfo): Boolean {
+        val queue = java.util.ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        while (queue.isNotEmpty()) {
+            val node = queue.poll() ?: continue
+            val cls = node.className?.toString() ?: ""
+            if (cls.contains("EditText")) return true
+            val text = (node.text ?: node.contentDescription)?.toString()?.lowercase() ?: ""
+            if (text.contains("message") || text.contains("send") || text.contains("type a") || text.contains("chat")) {
+                return true
+            }
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it) }
+            }
+        }
+        return false
+    }
+
+    private fun findFirstValidText(root: AccessibilityNodeInfo): String? {
+        val text = (root.text ?: root.contentDescription)?.toString()
+        val cls = root.className?.toString() ?: ""
+        if (!text.isNullOrEmpty() && text.length > 1 && !cls.contains("EditText") && !isBadKeyword(text)) {
+            return text
+        }
+        for (i in 0 until root.childCount) {
+            val child = root.getChild(i) ?: continue
+            val result = findFirstValidText(child)
+            if (result != null) return result
+        }
+        return null
     }
 
     
@@ -366,7 +410,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
     private val badKeywords = listOf(
         "search", "type a message", "new chat", "camera", "more options",
         "attach", "voice message", "status", "calls", "chats", "communities",
-        "whatsapp", "instagram", "snapchat", "meta", "friends"
+        "whatsapp", "instagram", "snapchat", "meta", "friends", "back", "navigate up", "video call", "voice call"
     )
 
     // Removed extractContactNameFromScreen as it was too aggressive
