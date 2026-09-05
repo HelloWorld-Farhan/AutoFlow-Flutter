@@ -307,7 +307,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
 
     private fun extractContactNameFromNode(node: AccessibilityNodeInfo): Boolean {
         val className = node.className?.toString() ?: ""
-        if (className.contains("EditText") || className.contains("ImageView") || className.contains("ImageButton") || className.contains("Button")) {
+        if (className.contains("EditText") || className.contains("Button")) {
             return false 
         }
 
@@ -328,8 +328,33 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             }
         }
         
-        if (contactName == null && (className.contains("Layout") || className.contains("ViewGroup"))) {
-            contactName = extractTextRecursively(node)
+        if (contactName == null) {
+            contactName = node.text?.toString()
+            if (contactName.isNullOrEmpty()) {
+                contactName = node.contentDescription?.toString()
+            }
+            if (contactName.isNullOrEmpty()) {
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i)
+                    if (child != null) {
+                        val childText = child.text?.toString()
+                        if (!childText.isNullOrEmpty()) {
+                            contactName = childText
+                            break
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (contactName != null) {
+            val lower = contactName.lowercase()
+            if (lower.contains("search") || lower.contains("type a message") || 
+                lower.contains("new chat") || lower.contains("camera") || 
+                lower.contains("more options") || lower.contains("attach") || 
+                lower.contains("voice message")) {
+                contactName = null
+            }
         }
         
         if (!contactName.isNullOrEmpty()) {
@@ -345,22 +370,6 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             return true
         }
         return false
-    }
-
-    private fun extractTextRecursively(node: AccessibilityNodeInfo?): String? {
-        if (node == null) return null
-        val cls = node.className?.toString() ?: ""
-        if (cls.contains("ImageView") || cls.contains("ImageButton")) return null
-        
-        val text = node.text?.toString()
-        if (!text.isNullOrEmpty() && text.length > 1 && !text.matches(Regex(".*\\d{1,2}:\\d{2}.*"))) {
-            return text
-        }
-        for (i in 0 until node.childCount) {
-            val childText = extractTextRecursively(node.getChild(i))
-            if (childText != null) return childText
-        }
-        return null
     }
 
     private fun handleInstagramAutomation(rootNode: AccessibilityNodeInfo) {
