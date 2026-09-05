@@ -78,7 +78,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             }
         }
         
-        if (key == "flutter_start_pick_contact") {
+        if (key == "flutter.flutter_start_pick_contact") {
             val payload = sharedPreferences?.getString(key, null)
             if (payload != null && payload.isNotEmpty()) {
                 isPickingContact = true
@@ -90,6 +90,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                 when (payload) {
                     "whatsapp" -> packageName = "com.whatsapp"
                     "instagram" -> packageName = "com.instagram.android"
+                    "snapchat" -> packageName = "com.snapchat.android"
                 }
                 
                 if (packageName.isNotEmpty()) {
@@ -147,7 +148,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
     }
     
     private fun enterPin() {
-        val pin = prefs.getString("flutter_lockscreen_pin", "")
+        val pin = prefs.getString("flutter.lockscreen_pin", "")
         if (pin.isNullOrEmpty()) {
             Log.e(TAG, "No PIN stored! Cannot unlock device.")
             isAutomating = false
@@ -164,8 +165,27 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         // 7, 8, 9
         //    0, OK
         
-        // For this mega update, we simulate the clicks. 
-        // Real implementation requires recursive node search.
+        // Attempt to find password EditText for complex passwords
+        val root = rootInActiveWindow
+        if (root != null) {
+            val passwordNodes = root.findAccessibilityNodeInfosByViewId("com.android.systemui:id/passwordEntry")
+            if (passwordNodes.isNotEmpty()) {
+                val args = Bundle()
+                args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, pin)
+                passwordNodes[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                Handler(Looper.getMainLooper()).postDelayed({
+                    // Press Enter on keyboard by dispatching key event or clicking ok
+                    clickNodeByText("OK")
+                    clickNodeByText("Done")
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        launchTargetApp()
+                    }, 1000)
+                }, 500)
+                return
+            }
+        }
+        
+        // Fallback to numeric PIN tapping
         var delay = 0L
         for (digit in pin) {
             Handler(Looper.getMainLooper()).postDelayed({
@@ -307,7 +327,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         if (!contactName.isNullOrEmpty()) {
             Log.d(TAG, "Contact picked: \$contactName")
             isPickingContact = false
-            prefs.edit().putString("flutter_contact_picked", contactName).apply()
+            prefs.edit().putString("flutter.flutter_contact_picked", contactName).apply()
             
             val intent = packageManager.getLaunchIntentForPackage("com.helloworld.autoflow.autoflow")
             if (intent != null) {

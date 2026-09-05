@@ -21,7 +21,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBinding
   final _titleController = TextEditingController();
   final _targetController = TextEditingController();
   final _payloadController = TextEditingController();
-  String _selectedType = 'whatsapp';
+  String _selectedType = 'select';
   DateTime _scheduledDate = DateTime.now();
   TimeOfDay _scheduledTime = TimeOfDay.now().replacing(minute: TimeOfDay.now().minute + 5 > 59 ? 59 : TimeOfDay.now().minute + 5);
   bool _isRecurring = false;
@@ -165,9 +165,12 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBinding
                   value: _selectedType,
                   isExpanded: true,
                   items: const [
+                    DropdownMenuItem(value: 'select', child: Text('Select Platform')),
                     DropdownMenuItem(value: 'whatsapp', child: Text('WhatsApp')),
                     DropdownMenuItem(value: 'instagram', child: Text('Instagram')),
                     DropdownMenuItem(value: 'snapchat', child: Text('Snapchat')),
+                    DropdownMenuItem(value: 'sms', child: Text('SMS Message')),
+                    DropdownMenuItem(value: 'call', child: Text('Phone Call')),
                     DropdownMenuItem(value: 'workflow', child: Text('Custom Workflow')),
                   ],
                   onChanged: (val) => setState(() => _selectedType = val!),
@@ -176,16 +179,16 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBinding
             ),
             const SizedBox(height: 24),
 
-            if (_selectedType != 'workflow') ...[
+            if (_selectedType != 'workflow' && _selectedType != 'select') ...[
               Text('Target (Contact / Username)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               InkWell(
                 onTap: () async {
-                  if (_selectedType == 'whatsapp' || _selectedType == 'instagram') {
+                  if (_selectedType == 'whatsapp' || _selectedType == 'instagram' || _selectedType == 'snapchat') {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setString('flutter_start_pick_contact', _selectedType);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Opening \$_selectedType... Tap any contact to select it!')),
+                      SnackBar(content: Text('Opening $_selectedType... Tap any contact to select it!')),
                     );
                   } else {
                     try {

@@ -45,7 +45,7 @@ class _LockscreenConfigScreenState extends State<LockscreenConfigScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundWhite,
       appBar: AppBar(
-        title: const Text('Lockscreen Automation PIN'),
+        title: const Text('Lockscreen PIN / Password / Pattern'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -64,7 +64,7 @@ class _LockscreenConfigScreenState extends State<LockscreenConfigScreen> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'AutoFlow needs your lockscreen PIN to automatically unlock your phone when executing scheduled tasks while the screen is off. This is stored securely on your device.',
+                      'AutoFlow needs your lockscreen PIN or Password to unlock your phone. If you use a Pattern lock, you must use the Custom Workflow recorder to trace your pattern!',
                       style: TextStyle(color: Colors.black87, fontSize: 13),
                     ),
                   ),
@@ -72,14 +72,14 @@ class _LockscreenConfigScreenState extends State<LockscreenConfigScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            Text('Device PIN', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Device PIN or Password', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
               controller: _pinController,
               keyboardType: TextInputType.visiblePassword,
               obscureText: true,
               decoration: InputDecoration(
-                hintText: 'Enter your phone lock PIN',
+                hintText: 'Enter your phone lock PIN or Password',
                 filled: true,
                 fillColor: AppTheme.cardWhite,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
