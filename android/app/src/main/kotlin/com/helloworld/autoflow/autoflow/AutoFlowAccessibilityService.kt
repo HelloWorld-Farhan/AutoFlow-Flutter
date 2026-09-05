@@ -260,11 +260,11 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             // Fallback: catch clicks on contact rows (e.g., search results or home screen)
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                 val node = event.source ?: return
-                // Walk up to 4 levels to find the text (in case they tapped a nested profile picture)
+                // Walk up to 10 levels to find the text (in case they tapped a nested profile picture in complex apps like Insta/Snap)
                 var currentNode: AccessibilityNodeInfo? = node
                 var name: String? = null
                 var depth = 0
-                while (currentNode != null && depth < 4) {
+                while (currentNode != null && depth < 10) {
                     name = getFirstMeaningfulText(currentNode)
                     if (name != null) break
                     currentNode = currentNode.parent
@@ -374,7 +374,10 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
     private fun getFirstMeaningfulText(node: AccessibilityNodeInfo): String? {
         val cls = node.className?.toString() ?: ""
         if (cls.contains("EditText")) return null
-        val text = node.text?.toString()
+        var text = node.text?.toString()
+        if (text.isNullOrEmpty()) {
+            text = node.contentDescription?.toString()
+        }
         if (!text.isNullOrEmpty() && text.length > 1 && !isBadKeyword(text)) return text
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
