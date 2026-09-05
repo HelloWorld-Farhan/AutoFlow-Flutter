@@ -244,8 +244,8 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         if (event == null) return
 
         if (isPickingContact && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            val node = event.source ?: return
-            if (extractContactNameFromNode(node)) {
+            val root = rootInActiveWindow ?: return
+            if (extractContactNameFromScreen(root)) {
                 return
             }
         }
@@ -305,71 +305,75 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         }
     }
 
-    private fun extractContactNameFromNode(node: AccessibilityNodeInfo): Boolean {
-        val className = node.className?.toString() ?: ""
-        if (className.contains("EditText") || className.contains("Button")) {
-            return false 
-        }
+    private val badKeywords = listOf(
+        "search", "type a message", "new chat", "camera", "more options",
+        "attach", "voice message", "status", "calls", "chats", "communities"
+    )
 
-        var contactName: String? = null
-        
+    private fun extractContactNameFromScreen(root: AccessibilityNodeInfo): Boolean {
+        // Strategy 1: Look for the known precise view IDs for each platform
         val knownIds = listOf(
             "com.whatsapp:id/conversations_row_contact_name",
             "com.whatsapp:id/contactpicker_row_name",
+            "com.whatsapp:id/chat_row_name",
             "com.instagram.android:id/row_search_user_username",
             "com.instagram.android:id/row_inbox_username",
-            "com.snapchat.android:id/feed_display_name"
+            "com.instagram.android:id/direct_message_user_name",
+            "com.snapchat.android:id/feed_display_name",
+            "com.snapchat.android:id/username_label"
         )
         for (id in knownIds) {
-            val nodes = node.findAccessibilityNodeInfosByViewId(id)
-            if (nodes.isNotEmpty() && !nodes[0].text.isNullOrEmpty()) {
-                contactName = nodes[0].text.toString()
-                break
-            }
-        }
-        
-        if (contactName == null) {
-            contactName = node.text?.toString()
-            if (contactName.isNullOrEmpty()) {
-                contactName = node.contentDescription?.toString()
-            }
-            if (contactName.isNullOrEmpty()) {
-                for (i in 0 until node.childCount) {
-                    val child = node.getChild(i)
-                    if (child != null) {
-                        val childText = child.text?.toString()
-                        if (!childText.isNullOrEmpty()) {
-                            contactName = childText
-                            break
-                        }
-                    }
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            for (node in nodes) {
+                val text = node.text?.toString()
+                if (!text.isNullOrEmpty() && !isBadKeyword(text)) {
+                    Log.d(TAG, "[Strategy1] Contact found by ID: $text")
+                    return sendContactBack(text)
                 }
             }
         }
-        
-        if (contactName != null) {
-            val lower = contactName.lowercase()
-            if (lower.contains("search") || lower.contains("type a message") || 
-                lower.contains("new chat") || lower.contains("camera") || 
-                lower.contains("more options") || lower.contains("attach") || 
-                lower.contains("voice message")) {
-                contactName = null
+
+        // Strategy 2: Walk the tree and grab the first meaningful text from a focused/selected node
+        val focusedNode = root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        if (focusedNode != null) {
+            val name = getFirstMeaningfulText(focusedNode)
+            if (name != null) {
+                Log.d(TAG, "[Strategy2] Contact from focused node: $name")
+                return sendContactBack(name)
             }
         }
-        
-        if (!contactName.isNullOrEmpty()) {
-            Log.d(TAG, "Contact picked: $contactName")
-            isPickingContact = false
-            prefs.edit().putString("flutter.flutter_contact_picked", contactName).apply()
-            
-            val intent = packageManager.getLaunchIntentForPackage("com.helloworld.autoflow.autoflow")
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                startActivity(intent)
-            }
-            return true
-        }
+
         return false
+    }
+
+    private fun getFirstMeaningfulText(node: AccessibilityNodeInfo): String? {
+        val cls = node.className?.toString() ?: ""
+        if (cls.contains("EditText")) return null
+        val text = node.text?.toString()
+        if (!text.isNullOrEmpty() && text.length > 1 && !isBadKeyword(text)) return text
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val result = getFirstMeaningfulText(child)
+            if (result != null) return result
+        }
+        return null
+    }
+
+    private fun isBadKeyword(text: String): Boolean {
+        val lower = text.lowercase()
+        return badKeywords.any { lower.contains(it) }
+    }
+
+    private fun sendContactBack(contactName: String): Boolean {
+        Log.d(TAG, "Contact picked: $contactName")
+        isPickingContact = false
+        prefs.edit().putString("flutter.flutter_contact_picked", contactName).apply()
+        val intent = packageManager.getLaunchIntentForPackage("com.helloworld.autoflow.autoflow")
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            startActivity(intent)
+        }
+        return true
     }
 
     private fun handleInstagramAutomation(rootNode: AccessibilityNodeInfo) {
