@@ -23,7 +23,7 @@ class MainActivity : FlutterFragmentActivity() {
                     result.success(true)
                 }
                 "checkAccessibilityPermission" -> {
-                    val isEnabled = isAccessibilityServiceEnabled(context, AutoFlowAccessibilityService::class.java)
+                    val isEnabled = isAccessibilityServiceEnabled(this, AutoFlowAccessibilityService::class.java)
                     result.success(isEnabled)
                 }
                 "requestAccessibilityPermission" -> {
