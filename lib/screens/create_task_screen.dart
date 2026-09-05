@@ -127,7 +127,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                     final Contact? contact = await FlutterContacts.native.showPicker();
                     if (contact != null) {
                       setState(() {
-                        _targetController.text = contact.displayName;
+                        _targetController.text = contact.displayName ?? '';
                       });
                     }
                   }
