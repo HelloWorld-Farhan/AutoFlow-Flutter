@@ -252,27 +252,24 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                 // A new screen just opened in the target app - read the title
                 Handler(Looper.getMainLooper()).postDelayed({
                     val root = rootInActiveWindow ?: return@postDelayed
-                    if (tryExtractFromConversationHeader(root, pkg)) {
-                        return@postDelayed
-                    }
-                    // Fallback: scan entire screen on window change
-                    extractContactNameFromScreen(root)
+                    tryExtractFromConversationHeader(root, pkg)
                 }, 300) // small delay so the screen fully renders
                 return
             }
 
             // Fallback: catch clicks on contact rows (e.g., search results)
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-                val node = event.source
-                if (node != null) {
-                    val name = getFirstMeaningfulText(node)
-                    if (name != null) {
-                        Log.d(TAG, "[Strategy3] Contact from clicked node: $name")
-                        if (sendContactBack(name)) return
-                    }
+                val node = event.source ?: return
+                // Check if the node they clicked or its parent has a valid name
+                var name = getFirstMeaningfulText(node)
+                if (name == null && node.parent != null) {
+                    name = getFirstMeaningfulText(node.parent)
                 }
-                val root = rootInActiveWindow ?: return
-                extractContactNameFromScreen(root)
+                
+                if (name != null) {
+                    Log.d(TAG, "[Strategy3] Contact from clicked node: $name")
+                    sendContactBack(name)
+                }
                 return
             }
         }
@@ -372,41 +369,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         "attach", "voice message", "status", "calls", "chats", "communities"
     )
 
-    private fun extractContactNameFromScreen(root: AccessibilityNodeInfo): Boolean {
-        // Strategy 1: Look for the known precise view IDs for each platform
-        val knownIds = listOf(
-            "com.whatsapp:id/conversations_row_contact_name",
-            "com.whatsapp:id/contactpicker_row_name",
-            "com.whatsapp:id/chat_row_name",
-            "com.instagram.android:id/row_search_user_username",
-            "com.instagram.android:id/row_inbox_username",
-            "com.instagram.android:id/direct_message_user_name",
-            "com.snapchat.android:id/feed_display_name",
-            "com.snapchat.android:id/username_label"
-        )
-        for (id in knownIds) {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            for (node in nodes) {
-                val text = node.text?.toString()
-                if (!text.isNullOrEmpty() && !isBadKeyword(text)) {
-                    Log.d(TAG, "[Strategy1] Contact found by ID: $text")
-                    return sendContactBack(text)
-                }
-            }
-        }
-
-        // Strategy 2: Walk the tree and grab the first meaningful text from a focused/selected node
-        val focusedNode = root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
-        if (focusedNode != null) {
-            val name = getFirstMeaningfulText(focusedNode)
-            if (name != null) {
-                Log.d(TAG, "[Strategy2] Contact from focused node: $name")
-                return sendContactBack(name)
-            }
-        }
-
-        return false
-    }
+    // Removed extractContactNameFromScreen as it was too aggressive
 
     private fun getFirstMeaningfulText(node: AccessibilityNodeInfo): String? {
         val cls = node.className?.toString() ?: ""
