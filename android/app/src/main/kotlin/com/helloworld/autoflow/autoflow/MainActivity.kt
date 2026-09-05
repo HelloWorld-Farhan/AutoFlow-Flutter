@@ -16,6 +16,12 @@ class MainActivity : FlutterFragmentActivity() {
         
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
+                "bringToForeground" -> {
+                    val intent = Intent(this, MainActivity::class.java)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    startActivity(intent)
+                    result.success(true)
+                }
                 "checkAccessibilityPermission" -> {
                     val isEnabled = isAccessibilityServiceEnabled(context, AutoFlowAccessibilityService::class.java)
                     result.success(isEnabled)

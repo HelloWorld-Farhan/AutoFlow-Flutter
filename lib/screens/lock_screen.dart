@@ -33,10 +33,8 @@ class _LockScreenState extends State<LockScreen> {
       });
       authenticated = await auth.authenticate(
         localizedReason: 'Please authenticate to access AutoFlow',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: false,
-        ),
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
       );
       setState(() {
         _isAuthenticating = false;

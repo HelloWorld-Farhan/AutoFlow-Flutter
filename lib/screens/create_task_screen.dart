@@ -123,8 +123,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             InkWell(
               onTap: () async {
                 try {
-                  if (await FlutterContacts.requestPermission()) {
-                    final Contact? contact = await FlutterContacts.openExternalPick();
+                  if (await Permission.contacts.request().isGranted) {
+                    final Contact? contact = await FlutterContacts.native.showPicker();
                     if (contact != null) {
                       setState(() {
                         _targetController.text = contact.displayName;
