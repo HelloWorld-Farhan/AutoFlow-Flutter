@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:contacts_service/contacts_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/auto_task.dart';
 import '../theme/app_theme.dart';
 
@@ -118,13 +120,43 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
             Text('Target (Contact / Username)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            TextField(
-              controller: _targetController,
-              decoration: InputDecoration(
-                hintText: 'e.g., +1234567890 or @username',
-                filled: true,
-                fillColor: AppTheme.cardWhite,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            InkWell(
+              onTap: () async {
+                try {
+                  if (await Permission.contacts.request().isGranted) {
+                    final Contact? contact = await ContactsService.openDeviceContactPicker();
+                    if (contact != null) {
+                      setState(() {
+                        _targetController.text = contact.displayName ?? '';
+                      });
+                    }
+                  }
+                } catch (e) {
+                  print('Error picking contact: \$e');
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardWhite,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.contacts, color: AppTheme.primaryBlue),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _targetController.text.isEmpty ? 'Select Recipient from Contacts' : _targetController.text,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: _targetController.text.isEmpty ? Colors.grey.shade500 : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),

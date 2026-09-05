@@ -1,6 +1,6 @@
 package com.helloworld.autoflow.autoflow
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.content.Intent
@@ -8,7 +8,7 @@ import android.provider.Settings
 import android.content.Context
 import android.text.TextUtils
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.helloworld.autoflow/automation"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

@@ -39,7 +39,7 @@ class AppTheme {
           elevation: 0,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardWhite,
         elevation: 2,
         shadowColor: Colors.black.withOpacity(0.05),

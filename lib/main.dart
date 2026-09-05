@@ -6,18 +6,16 @@ import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'theme/app_theme.dart';
-import 'screens/dashboard_screen.dart';
 import 'models/auto_task.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/lock_screen.dart';
+import 'package:system_alert_window/system_alert_window.dart';
 
 // Top-level function for Workmanager background execution
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     print("Native called background task: $task");
-    
-    // In a real app with native automation (AccessibilityService), 
-    // we would trigger MethodChannels here to tell the native side to execute.
-    // Since this is a Flutter-only stub, we just print and mark as done.
     
     if (task == "execute_auto_task") {
       try {
@@ -32,6 +30,56 @@ void callbackDispatcher() {
           final autoTask = await isar.autoTasks.get(taskId);
           if (autoTask != null) {
             print("Executing task: ${autoTask.title}");
+            
+            // Show Countdown Overlay
+            SystemWindowHeader header = SystemWindowHeader(
+              title: SystemWindowText(text: "Automation Starting", fontSize: 20, fontWeight: FontWeight.BOLD, textColor: Colors.black45),
+              decoration: SystemWindowDecoration(startColor: Colors.grey[100]),
+            );
+            SystemWindowBody body = SystemWindowBody(
+              rows: [
+                EachRow(
+                  columns: [
+                    EachColumn(
+                      text: SystemWindowText(text: "Executing: ${autoTask.title}", fontSize: 16, textColor: Colors.black45),
+                    ),
+                  ],
+                  gravity: ContentGravity.CENTER,
+                ),
+              ],
+              padding: SystemWindowPadding(left: 16, right: 16, bottom: 12, top: 12),
+            );
+            SystemWindowFooter footer = SystemWindowFooter(
+              buttons: [
+                SystemWindowButton(
+                  text: SystemWindowText(text: "CANCEL", fontSize: 14, textColor: Colors.white),
+                  tag: "cancel_automation",
+                  width: 0,
+                  height: SystemWindowButton.WRAP_CONTENT,
+                  decoration: SystemWindowDecoration(startColor: Colors.red, endColor: Colors.redAccent, borderRadius: 12.0),
+                )
+              ],
+              padding: SystemWindowPadding(left: 16, right: 16, bottom: 12),
+              decoration: SystemWindowDecoration(startColor: Colors.white),
+              buttonsPosition: ButtonPosition.CENTER
+            );
+
+            SystemAlertWindow.showSystemWindow(
+                height: 230,
+                header: header,
+                body: body,
+                footer: footer,
+                margin: SystemWindowMargin(left: 8, right: 8, top: 100, bottom: 0),
+                gravity: SystemWindowGravity.TOP,
+                notificationTitle: "AutoFlow Running",
+                notificationBody: "Automation is starting in 5 seconds...",
+            );
+
+            // Wait 5 seconds
+            await Future.delayed(const Duration(seconds: 5));
+            
+            // Close overlay
+            SystemAlertWindow.closeSystemWindow();
             
             // Trigger the native Accessibility Service via MethodChannel
             if (autoTask.taskType == 'whatsapp' && autoTask.target != null && autoTask.payload != null) {
@@ -90,8 +138,6 @@ void main() async {
   );
 
   runApp(const AutoFlowApp());
-}
-
 class AutoFlowApp extends StatelessWidget {
   const AutoFlowApp({super.key});
 
@@ -101,7 +147,7 @@ class AutoFlowApp extends StatelessWidget {
       title: 'AutoFlow',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: DashboardScreen(isar: isar),
+      home: LockScreen(isar: isar),
     );
   }
 }
