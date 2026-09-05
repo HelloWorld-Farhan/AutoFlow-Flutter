@@ -247,17 +247,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             val pkg = event.packageName?.toString() ?: ""
             val isTargetApp = pkg == "com.whatsapp" || pkg == "com.instagram.android" || pkg == "com.snapchat.android"
 
-            // Primary strategy: detect navigation into a conversation/chat screen
-            if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                // A new screen just opened in the target app - read the title
-                Handler(Looper.getMainLooper()).postDelayed({
-                    val root = rootInActiveWindow ?: return@postDelayed
-                    tryExtractFromConversationHeader(root, pkg)
-                }, 300) // small delay so the screen fully renders
-                return
-            }
-
-            // Fallback: catch clicks on contact rows (e.g., search results)
+            // Primary strategy: catch clicks on contact rows (e.g., search results or home screen)
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                 val node = event.source ?: return
                 // Check if the node they clicked or its parent has a valid name
@@ -366,7 +356,8 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
 
     private val badKeywords = listOf(
         "search", "type a message", "new chat", "camera", "more options",
-        "attach", "voice message", "status", "calls", "chats", "communities"
+        "attach", "voice message", "status", "calls", "chats", "communities",
+        "whatsapp", "instagram", "snapchat", "meta", "friends"
     )
 
     // Removed extractContactNameFromScreen as it was too aggressive

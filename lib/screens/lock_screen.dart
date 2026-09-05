@@ -54,10 +54,11 @@ class _LockScreenState extends State<LockScreen> {
 
       if (!hasOnboarded) {
         prefs.setBool('has_onboarded', true);
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => OnboardingScreen(onFinished: () {
+              Navigator.pop(context);
               setState(() {
                 _isAuthenticated = true;
               });
