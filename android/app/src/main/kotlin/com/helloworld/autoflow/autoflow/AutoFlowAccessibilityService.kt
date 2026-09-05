@@ -78,27 +78,26 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             }
         }
         
-        if (key == "flutter.flutter_start_pick_contact") {
-            val payload = sharedPreferences?.getString(key, null)
-            if (payload != null && payload.isNotEmpty()) {
-                isPickingContact = true
-                pickingPlatform = payload
-                sharedPreferences.edit().remove(key).apply()
-                Log.d(TAG, "Starting contact picker for \$payload")
-                
-                var packageName = ""
-                when (payload) {
-                    "whatsapp" -> packageName = "com.whatsapp"
-                    "instagram" -> packageName = "com.instagram.android"
-                    "snapchat" -> packageName = "com.snapchat.android"
-                }
-                
-                if (packageName.isNotEmpty()) {
-                    val intent = packageManager.getLaunchIntentForPackage(packageName)
-                    if (intent != null) {
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                    }
+    }
+
+    fun startContactPicker(platform: String) {
+        if (platform.isNotEmpty()) {
+            isPickingContact = true
+            pickingPlatform = platform
+            Log.d(TAG, "Starting contact picker via MethodChannel for $platform")
+            
+            var packageName = ""
+            when (platform) {
+                "whatsapp" -> packageName = "com.whatsapp"
+                "instagram" -> packageName = "com.instagram.android"
+                "snapchat" -> packageName = "com.snapchat.android"
+            }
+            
+            if (packageName.isNotEmpty()) {
+                val intent = packageManager.getLaunchIntentForPackage(packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
                 }
             }
         }

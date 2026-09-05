@@ -33,6 +33,11 @@ class MainActivity : FlutterFragmentActivity() {
                     result.success(true)
                 }
 
+                "startContactPicker" -> {
+                    val platform = call.argument<String>("platform") ?: ""
+                    AutoFlowAccessibilityService.instance?.startContactPicker(platform)
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }

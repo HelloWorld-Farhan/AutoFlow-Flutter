@@ -8,6 +8,7 @@ import '../models/auto_task.dart';
 import '../theme/app_theme.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 class CreateTaskScreen extends StatefulWidget {
   final Isar isar;
@@ -185,11 +186,41 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBinding
               InkWell(
                 onTap: () async {
                   if (widget.platformType == 'whatsapp' || widget.platformType == 'instagram' || widget.platformType == 'snapchat') {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setString('flutter_start_pick_contact', widget.platformType);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Opening ${widget.platformType}... Tap any contact to select it!')),
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: AppTheme.cardWhite,
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(color: AppTheme.primaryBlue),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Opening ${widget.platformType[0].toUpperCase()}${widget.platformType.substring(1)}...',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Tap any contact to select it!',
+                              style: TextStyle(color: Colors.grey, fontSize: 13),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
                     );
+
+                    final platform = const MethodChannel('com.helloworld.autoflow/automation');
+                    try {
+                      await platform.invokeMethod('startContactPicker', {'platform': widget.platformType});
+                    } catch (e) {
+                      print('Error launching contact picker: $e');
+                    }
+
+                    if (mounted) {
+                      Navigator.pop(context); // Close the dialog
+                    }
                   } else {
                     try {
                       if (await Permission.contacts.request().isGranted) {

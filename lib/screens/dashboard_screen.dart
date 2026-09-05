@@ -214,10 +214,44 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 log.success ? 'Executed Successfully' : (log.errorMessage ?? 'Failed'),
                                 style: TextStyle(color: log.success ? Colors.green : Colors.red),
                               ),
-                              trailing: Text(
-                                "\${log.executedAt.hour}:\${log.executedAt.minute.toString().padLeft(2, '0')}\\n\${log.executedAt.day}/\${log.executedAt.month}",
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "${log.executedAt.hour}:${log.executedAt.minute.toString().padLeft(2, '0')}\n${log.executedAt.day}/${log.executedAt.month}",
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Delete History'),
+                                          content: const Text('Are you sure you want to delete this log?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                Navigator.pop(context);
+                                                await widget.isar.writeTxn(() async {
+                                                  await widget.isar.taskHistorys.delete(log.id);
+                                                });
+                                                _loadData();
+                                              },
+                                              child: const Text('Delete', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
                           ).animate().fade().slideY(begin: 0.1, end: 0);
