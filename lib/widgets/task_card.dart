@@ -59,17 +59,41 @@ class TaskCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: task.isCompleted
-            ? const Icon(Icons.check_circle, color: AppTheme.accentGreen)
-            : IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () async {
-                  await isar.writeTxn(() async {
-                    await isar.autoTasks.delete(task.id);
-                  });
-                  onRefresh();
-                },
-              ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (task.isCompleted)
+              const Icon(Icons.check_circle, color: AppTheme.accentGreen),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Task'),
+                    content: const Text('Are you sure you want to delete this task?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await isar.writeTxn(() async {
+                            await isar.autoTasks.delete(task.id);
+                          });
+                          onRefresh();
+                        },
+                        child: const Text('Delete', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -52,6 +52,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBinding
 
   Future<void> _checkPickedContact() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final picked = prefs.getString('flutter_contact_picked');
     if (picked != null && picked.isNotEmpty) {
       setState(() {
