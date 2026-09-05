@@ -247,7 +247,17 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             val pkg = event.packageName?.toString() ?: ""
             val isTargetApp = pkg == "com.whatsapp" || pkg == "com.instagram.android" || pkg == "com.snapchat.android"
 
-            // Primary strategy: catch clicks on contact rows (e.g., search results or home screen)
+            // Primary strategy: detect navigation into a conversation/chat screen (safety net)
+            if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                // A new screen just opened in the target app - read the title
+                Handler(Looper.getMainLooper()).postDelayed({
+                    val root = rootInActiveWindow ?: return@postDelayed
+                    tryExtractFromConversationHeader(root, pkg)
+                }, 300) // small delay so the screen fully renders
+                return
+            }
+
+            // Fallback: catch clicks on contact rows (e.g., search results or home screen)
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                 val node = event.source ?: return
                 // Walk up to 4 levels to find the text (in case they tapped a nested profile picture)
@@ -283,19 +293,13 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         // Platform-specific title bar IDs for the conversation/chat open screen
         val titleIds = when (pkg) {
             "com.whatsapp" -> listOf(
-                "com.whatsapp:id/conversation_contact_name",
-                "com.whatsapp:id/toolbar_title",
-                "com.whatsapp:id/contact_name"
+                "com.whatsapp:id/conversation_contact_name"
             )
             "com.instagram.android" -> listOf(
-                "com.instagram.android:id/action_bar_title",
-                "com.instagram.android:id/direct_thread_title_type",
-                "com.instagram.android:id/row_inbox_username"
+                "com.instagram.android:id/direct_thread_title_type"
             )
             "com.snapchat.android" -> listOf(
-                "com.snapchat.android:id/chat_input_bar_title",
-                "com.snapchat.android:id/action_bar_title",
-                "com.snapchat.android:id/feed_display_name"
+                "com.snapchat.android:id/chat_input_bar_title"
             )
             else -> emptyList()
         }
