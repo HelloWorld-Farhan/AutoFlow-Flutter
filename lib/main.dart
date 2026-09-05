@@ -35,21 +35,9 @@ void callbackDispatcher() {
             String? errorMsg;
             
             try {
-              final prefs = await SharedPreferences.getInstance();
-              
-              // We'll store a JSON string with instructions for the Accessibility Service
-              final String actionPayload = '''
-              {
-                "taskType": "\${autoTask.taskType}",
-                "target": "\${autoTask.target}",
-                "payload": "\${autoTask.payload ?? ''}",
-                "macroId": \${autoTask.macroId ?? -1},
-                "timestamp": \${DateTime.now().millisecondsSinceEpoch}
-              }
-              ''';
-
-              await prefs.setString('pending_automation', actionPayload);
-              print("Written to SharedPreferences for AccessibilityService to pick up");
+              // We now use native ExactAlarmReceiver to trigger the actual automation!
+              // Workmanager is only used to log to history and reschedule recurring tasks
+              // because exact alarms can't easily write to Flutter's Isar DB.
               success = true;
             } catch (e) {
               print("Failed to trigger native automation: \$e");

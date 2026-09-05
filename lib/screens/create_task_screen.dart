@@ -115,15 +115,36 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBinding
       await widget.isar.autoTasks.put(task);
     });
 
-    final delay = finalScheduledTime.difference(DateTime.now());
-    if (delay.isNegative) return;
+    final String actionPayload = '''
+    {
+      "taskType": "${task.taskType}",
+      "target": "${task.target}",
+      "payload": "${task.payload ?? ''}",
+      "macroId": ${task.macroId ?? -1},
+      "timestamp": ${DateTime.now().millisecondsSinceEpoch}
+    }
+    ''';
 
-    Workmanager().registerOneOffTask(
-      "task_\${task.id}",
-      "execute_auto_task",
-      initialDelay: delay,
-      inputData: {'taskId': task.id},
-    );
+    const platform = MethodChannel('com.helloworld.autoflow/automation');
+    try {
+      await platform.invokeMethod('scheduleExactTask', {
+        'taskId': task.id,
+        'timeInMillis': finalScheduledTime.millisecondsSinceEpoch,
+        'payload': actionPayload
+      });
+    } catch (e) {
+      print("Failed to schedule exact task: $e");
+    }
+
+    final delay = finalScheduledTime.difference(DateTime.now());
+    if (!delay.isNegative) {
+      Workmanager().registerOneOffTask(
+        "task_${task.id}",
+        "execute_auto_task",
+        initialDelay: delay,
+        inputData: {'taskId': task.id},
+      );
+    }
 
     if (mounted) {
       Navigator.pop(context);

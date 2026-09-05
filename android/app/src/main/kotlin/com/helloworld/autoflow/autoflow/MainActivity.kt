@@ -38,6 +38,31 @@ class MainActivity : FlutterFragmentActivity() {
                     AutoFlowAccessibilityService.instance?.startContactPicker(platform)
                     result.success(true)
                 }
+                "scheduleExactTask" -> {
+                    val taskId = call.argument<Int>("taskId") ?: 0
+                    val timeInMillis = call.argument<Long>("timeInMillis") ?: 0L
+                    val payload = call.argument<String>("payload") ?: ""
+                    
+                    val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+                    val intent = Intent(this, ExactAlarmReceiver::class.java).apply {
+                        putExtra("taskId", taskId)
+                        putExtra("payload", payload)
+                    }
+                    
+                    val pendingIntent = android.app.PendingIntent.getBroadcast(
+                        this,
+                        taskId,
+                        intent,
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                    )
+                    
+                    try {
+                        alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, timeInMillis, pendingIntent)
+                        result.success(true)
+                    } catch (e: SecurityException) {
+                        result.error("PERMISSION_DENIED", "Exact alarm permission missing", e.toString())
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
