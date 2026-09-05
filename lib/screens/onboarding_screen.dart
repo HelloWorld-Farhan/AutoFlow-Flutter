@@ -6,8 +6,8 @@ import 'dashboard_screen.dart';
 import 'package:isar/isar.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  final Isar isar;
-  const OnboardingScreen({super.key, required this.isar});
+  final VoidCallback onFinished;
+  const OnboardingScreen({super.key, required this.onFinished});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -116,10 +116,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: allGranted ? () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => DashboardScreen(isar: widget.isar)),
-                    );
+                    widget.onFinished();
                   } : () {
                     _checkAllPermissions();
                   },

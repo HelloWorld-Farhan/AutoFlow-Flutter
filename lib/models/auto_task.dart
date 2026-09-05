@@ -21,6 +21,12 @@ class AutoTask {
   String? payload;
 
   bool isCompleted = false;
+  
+  /// True if this task repeats daily
+  bool isRecurring = false;
+  
+  /// If taskType is custom_workflow, this points to the recorded macro
+  int? macroId;
 
   DateTime createdAt = DateTime.now();
 }

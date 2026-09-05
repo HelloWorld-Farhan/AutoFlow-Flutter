@@ -27,28 +27,38 @@ const AutoTaskSchema = CollectionSchema(
       name: r'isCompleted',
       type: IsarType.bool,
     ),
-    r'payload': PropertySchema(
+    r'isRecurring': PropertySchema(
       id: 2,
+      name: r'isRecurring',
+      type: IsarType.bool,
+    ),
+    r'macroId': PropertySchema(
+      id: 3,
+      name: r'macroId',
+      type: IsarType.long,
+    ),
+    r'payload': PropertySchema(
+      id: 4,
       name: r'payload',
       type: IsarType.string,
     ),
     r'scheduledTime': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'scheduledTime',
       type: IsarType.dateTime,
     ),
     r'target': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'target',
       type: IsarType.string,
     ),
     r'taskType': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'taskType',
       type: IsarType.string,
     ),
     r'title': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'title',
       type: IsarType.string,
     )
@@ -98,11 +108,13 @@ void _autoTaskSerialize(
 ) {
   writer.writeDateTime(offsets[0], object.createdAt);
   writer.writeBool(offsets[1], object.isCompleted);
-  writer.writeString(offsets[2], object.payload);
-  writer.writeDateTime(offsets[3], object.scheduledTime);
-  writer.writeString(offsets[4], object.target);
-  writer.writeString(offsets[5], object.taskType);
-  writer.writeString(offsets[6], object.title);
+  writer.writeBool(offsets[2], object.isRecurring);
+  writer.writeLong(offsets[3], object.macroId);
+  writer.writeString(offsets[4], object.payload);
+  writer.writeDateTime(offsets[5], object.scheduledTime);
+  writer.writeString(offsets[6], object.target);
+  writer.writeString(offsets[7], object.taskType);
+  writer.writeString(offsets[8], object.title);
 }
 
 AutoTask _autoTaskDeserialize(
@@ -115,11 +127,13 @@ AutoTask _autoTaskDeserialize(
   object.createdAt = reader.readDateTime(offsets[0]);
   object.id = id;
   object.isCompleted = reader.readBool(offsets[1]);
-  object.payload = reader.readStringOrNull(offsets[2]);
-  object.scheduledTime = reader.readDateTime(offsets[3]);
-  object.target = reader.readStringOrNull(offsets[4]);
-  object.taskType = reader.readString(offsets[5]);
-  object.title = reader.readString(offsets[6]);
+  object.isRecurring = reader.readBool(offsets[2]);
+  object.macroId = reader.readLongOrNull(offsets[3]);
+  object.payload = reader.readStringOrNull(offsets[4]);
+  object.scheduledTime = reader.readDateTime(offsets[5]);
+  object.target = reader.readStringOrNull(offsets[6]);
+  object.taskType = reader.readString(offsets[7]);
+  object.title = reader.readString(offsets[8]);
   return object;
 }
 
@@ -135,14 +149,18 @@ P _autoTaskDeserializeProp<P>(
     case 1:
       return (reader.readBool(offset)) as P;
     case 2:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 3:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 6:
+      return (reader.readStringOrNull(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -349,6 +367,85 @@ extension AutoTaskQueryFilter
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isCompleted',
         value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> isRecurringEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isRecurring',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> macroIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'macroId',
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> macroIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'macroId',
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> macroIdEqualTo(
+      int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'macroId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> macroIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'macroId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> macroIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'macroId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterFilterCondition> macroIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'macroId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -991,6 +1088,30 @@ extension AutoTaskQuerySortBy on QueryBuilder<AutoTask, AutoTask, QSortBy> {
     });
   }
 
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> sortByIsRecurring() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> sortByIsRecurringDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> sortByMacroId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'macroId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> sortByMacroIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'macroId', Sort.desc);
+    });
+  }
+
   QueryBuilder<AutoTask, AutoTask, QAfterSortBy> sortByPayload() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'payload', Sort.asc);
@@ -1090,6 +1211,30 @@ extension AutoTaskQuerySortThenBy
     });
   }
 
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> thenByIsRecurring() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> thenByIsRecurringDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> thenByMacroId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'macroId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QAfterSortBy> thenByMacroIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'macroId', Sort.desc);
+    });
+  }
+
   QueryBuilder<AutoTask, AutoTask, QAfterSortBy> thenByPayload() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'payload', Sort.asc);
@@ -1165,6 +1310,18 @@ extension AutoTaskQueryWhereDistinct
     });
   }
 
+  QueryBuilder<AutoTask, AutoTask, QDistinct> distinctByIsRecurring() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isRecurring');
+    });
+  }
+
+  QueryBuilder<AutoTask, AutoTask, QDistinct> distinctByMacroId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'macroId');
+    });
+  }
+
   QueryBuilder<AutoTask, AutoTask, QDistinct> distinctByPayload(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1217,6 +1374,18 @@ extension AutoTaskQueryProperty
   QueryBuilder<AutoTask, bool, QQueryOperations> isCompletedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isCompleted');
+    });
+  }
+
+  QueryBuilder<AutoTask, bool, QQueryOperations> isRecurringProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isRecurring');
+    });
+  }
+
+  QueryBuilder<AutoTask, int?, QQueryOperations> macroIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'macroId');
     });
   }
 

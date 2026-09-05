@@ -7,21 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'theme/app_theme.dart';
 import 'models/auto_task.dart';
+import 'models/history_model.dart';
+import 'models/macro_model.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/lock_screen.dart';
-import 'package:system_alert_window/system_alert_window.dart';
 
-// Top-level function for Workmanager background execution
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
-    print("Native called background task: $task");
+    print("Native called background task: \$task");
     
     if (task == "execute_auto_task") {
       try {
         final dir = await getApplicationDocumentsDirectory();
         final isar = await Isar.open(
-          [AutoTaskSchema],
+          [AutoTaskSchema, TaskHistorySchema, MacroModelSchema],
           directory: dir.path,
         );
 
@@ -29,44 +29,77 @@ void callbackDispatcher() {
         if (taskId != null) {
           final autoTask = await isar.autoTasks.get(taskId);
           if (autoTask != null) {
-            print("Executing task: ${autoTask.title}");
+            print("Executing task: \${autoTask.title}");
             
-            // Trigger the native Accessibility Service via MethodChannel
-            if (autoTask.taskType == 'whatsapp' && autoTask.target != null && autoTask.payload != null) {
-              const platform = MethodChannel('com.helloworld.autoflow/automation');
-              try {
-                await platform.invokeMethod('executeWhatsAppAutomation', {
-                  'contact': autoTask.target,
-                  'message': autoTask.payload,
-                });
-                print("Triggered Native WhatsApp Automation");
-              } catch (e) {
-                print("Failed to trigger native automation: $e");
+            bool success = false;
+            String? errorMsg;
+            
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              
+              // We'll store a JSON string with instructions for the Accessibility Service
+              final String actionPayload = '''
+              {
+                "taskType": "\${autoTask.taskType}",
+                "target": "\${autoTask.target}",
+                "payload": "\${autoTask.payload ?? ''}",
+                "macroId": \${autoTask.macroId ?? -1},
+                "timestamp": \${DateTime.now().millisecondsSinceEpoch}
               }
+              ''';
+
+              await prefs.setString('pending_automation', actionPayload);
+              print("Written to SharedPreferences for AccessibilityService to pick up");
+              success = true;
+            } catch (e) {
+              print("Failed to trigger native automation: \$e");
+              errorMsg = e.toString();
             }
             
-            // Mark as completed
+            // Log History
+            final log = TaskHistory()
+              ..taskId = autoTask.id
+              ..taskTitle = autoTask.title
+              ..taskType = autoTask.taskType
+              ..success = success
+              ..errorMessage = errorMsg
+              ..executedAt = DateTime.now();
+              
             await isar.writeTxn(() async {
-              autoTask.isCompleted = true;
-              await isar.autoTasks.put(autoTask);
+              await isar.taskHistorys.put(log);
+              
+              if (autoTask.isRecurring) {
+                // Reschedule for tomorrow
+                autoTask.scheduledTime = autoTask.scheduledTime.add(const Duration(days: 1));
+                await isar.autoTasks.put(autoTask);
+                
+                // Re-register workmanager
+                final delay = autoTask.scheduledTime.difference(DateTime.now());
+                Workmanager().registerOneOffTask(
+                  "task_\${autoTask.id}_\${DateTime.now().millisecondsSinceEpoch}",
+                  "execute_auto_task",
+                  initialDelay: delay,
+                  inputData: {'taskId': autoTask.id},
+                );
+              } else {
+                autoTask.isCompleted = true;
+                await isar.autoTasks.put(autoTask);
+              }
             });
           }
         }
         await isar.close();
       } catch (e) {
-        print("Error in background task: $e");
+        print("Error in background task: \$e");
       }
     }
     return Future.value(true);
   });
 }
 
-late Isar isar;
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Set status bar color
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -74,32 +107,30 @@ void main() async {
     ),
   );
 
-  // Initialize Workmanager
-  await Workmanager().initialize(
-    callbackDispatcher,
-    isInDebugMode: true, // Show notifications when task runs
-  );
+  await Workmanager().initialize(callbackDispatcher, isInDebugMode: true);
 
-  // Initialize Isar
   final dir = await getApplicationDocumentsDirectory();
-  isar = await Isar.open(
-    [AutoTaskSchema],
+  final isar = await Isar.open(
+    [AutoTaskSchema, TaskHistorySchema, MacroModelSchema],
     directory: dir.path,
   );
 
-  runApp(const AutoFlowApp());
+  runApp(AutoFlowApp(isar: isar));
 }
 
 class AutoFlowApp extends StatelessWidget {
-  const AutoFlowApp({super.key});
+  final Isar isar;
+  const AutoFlowApp({super.key, required this.isar});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AutoFlow',
-      theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: LockScreen(isar: isar),
+      theme: AppTheme.lightTheme,
+      home: LockScreen(
+        child: DashboardScreen(isar: isar),
+      ),
     );
   }
 }

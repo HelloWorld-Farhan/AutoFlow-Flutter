@@ -32,21 +32,7 @@ class MainActivity : FlutterFragmentActivity() {
                     startActivity(intent)
                     result.success(true)
                 }
-                "executeWhatsAppAutomation" -> {
-                    val contact = call.argument<String>("contact")
-                    val message = call.argument<String>("message")
-                    
-                    if (contact != null && message != null) {
-                        if (AutoFlowAccessibilityService.instance != null) {
-                            AutoFlowAccessibilityService.instance?.startWhatsAppAutomation(contact, message)
-                            result.success(true)
-                        } else {
-                            result.error("UNAVAILABLE", "Accessibility Service not running.", null)
-                        }
-                    } else {
-                        result.error("INVALID_ARGS", "Contact or Message missing", null)
-                    }
-                }
+
                 else -> {
                     result.notImplemented()
                 }

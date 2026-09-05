@@ -3,6 +3,7 @@ import 'package:isar/isar.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart';
 import '../models/auto_task.dart';
 import '../theme/app_theme.dart';
 
@@ -19,23 +20,32 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final _targetController = TextEditingController();
   final _payloadController = TextEditingController();
   String _selectedType = 'whatsapp';
-  DateTime _scheduledTime = DateTime.now().add(const Duration(minutes: 5));
+  DateTime _scheduledDate = DateTime.now();
+  TimeOfDay _scheduledTime = TimeOfDay.now().replacing(minute: TimeOfDay.now().minute + 5 > 59 ? 59 : TimeOfDay.now().minute + 5);
+  bool _isRecurring = false;
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (pickedDate != null) {
+      setState(() {
+        _scheduledDate = pickedDate;
+      });
+    }
+  }
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_scheduledTime),
+      initialTime: _scheduledTime,
     );
     if (pickedTime != null) {
-      final now = DateTime.now();
       setState(() {
-        _scheduledTime = DateTime(
-          now.year, now.month, now.day, pickedTime.hour, pickedTime.minute,
-        );
-        // If time is in the past, schedule for tomorrow
-        if (_scheduledTime.isBefore(now)) {
-          _scheduledTime = _scheduledTime.add(const Duration(days: 1));
-        }
+        _scheduledTime = pickedTime;
       });
     }
   }
@@ -43,23 +53,35 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   Future<void> _saveTask() async {
     if (_titleController.text.trim().isEmpty) return;
 
+    DateTime finalScheduledTime = DateTime(
+      _scheduledDate.year,
+      _scheduledDate.month,
+      _scheduledDate.day,
+      _scheduledTime.hour,
+      _scheduledTime.minute,
+    );
+    
+    if (finalScheduledTime.isBefore(DateTime.now())) {
+      finalScheduledTime = finalScheduledTime.add(const Duration(days: 1));
+    }
+
     final task = AutoTask()
       ..title = _titleController.text.trim()
       ..taskType = _selectedType
-      ..scheduledTime = _scheduledTime
+      ..scheduledTime = finalScheduledTime
       ..target = _targetController.text.trim()
-      ..payload = _payloadController.text.trim();
+      ..payload = _payloadController.text.trim()
+      ..isRecurring = _isRecurring;
 
     await widget.isar.writeTxn(() async {
       await widget.isar.autoTasks.put(task);
     });
 
-    // Schedule background task using Workmanager
-    final delay = _scheduledTime.difference(DateTime.now());
+    final delay = finalScheduledTime.difference(DateTime.now());
     if (delay.isNegative) return;
 
     Workmanager().registerOneOffTask(
-      "task_${task.id}",
+      "task_\${task.id}",
       "execute_auto_task",
       initialDelay: delay,
       inputData: {'taskId': task.id},
@@ -110,6 +132,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                   items: const [
                     DropdownMenuItem(value: 'whatsapp', child: Text('WhatsApp')),
                     DropdownMenuItem(value: 'instagram', child: Text('Instagram')),
+                    DropdownMenuItem(value: 'snapchat', child: Text('Snapchat')),
                     DropdownMenuItem(value: 'workflow', child: Text('Custom Workflow')),
                   ],
                   onChanged: (val) => setState(() => _selectedType = val!),
@@ -118,85 +141,135 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             ),
             const SizedBox(height: 24),
 
-            Text('Target (Contact / Username)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: () async {
-                try {
-                  if (await Permission.contacts.request().isGranted) {
-                    final Contact? contact = await FlutterContacts.native.showPicker();
-                    if (contact != null) {
-                      setState(() {
-                        _targetController.text = contact.displayName ?? '';
-                      });
+            if (_selectedType != 'workflow') ...[
+              Text('Target (Contact / Username)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  try {
+                    if (await Permission.contacts.request().isGranted) {
+                      final Contact? contact = await FlutterContacts.native.showPicker();
+                      if (contact != null) {
+                        setState(() {
+                          _targetController.text = contact.displayName ?? '';
+                        });
+                      }
                     }
+                  } catch (e) {
+                    print('Error picking contact: \$e');
                   }
-                } catch (e) {
-                  print('Error picking contact: \$e');
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.cardWhite,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.contacts, color: AppTheme.primaryBlue),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _targetController.text.isEmpty ? 'Select Recipient from Contacts' : _targetController.text,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: _targetController.text.isEmpty ? Colors.grey.shade500 : Colors.black87,
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardWhite,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.contacts, color: AppTheme.primaryBlue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _targetController.text.isEmpty ? 'Select Recipient from Contacts' : _targetController.text,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _targetController.text.isEmpty ? Colors.grey.shade500 : Colors.black87,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            Text('Payload / Message', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _payloadController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'What should the automation do or send?',
-                filled: true,
-                fillColor: AppTheme.cardWhite,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              Text('Payload / Message', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _payloadController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'What should the automation do or send?',
+                  filled: true,
+                  fillColor: AppTheme.cardWhite,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ],
 
-            Text('Scheduled Time', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Schedule', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            InkWell(
-              onTap: () => _selectTime(context),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.cardWhite,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.access_time, color: AppTheme.primaryBlue),
-                    const SizedBox(width: 12),
-                    Text(
-                      TimeOfDay.fromDateTime(_scheduledTime).format(context),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardWhite,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: AppTheme.primaryBlue, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('MMM dd, yyyy').format(_scheduledDate),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectTime(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardWhite,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time, color: AppTheme.primaryBlue, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            _scheduledTime.format(context),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.repeat, color: Colors.grey),
+                const SizedBox(width: 8),
+                const Text('Repeat Daily'),
+                const Spacer(),
+                Switch(
+                  value: _isRecurring,
+                  activeColor: AppTheme.primaryBlue,
+                  onChanged: (val) {
+                    setState(() {
+                      _isRecurring = val;
+                    });
+                  },
+                )
+              ],
             ),
             const SizedBox(height: 48),
 

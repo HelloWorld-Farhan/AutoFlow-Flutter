@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/auto_task.dart';
+import '../models/history_model.dart';
 import '../theme/app_theme.dart';
 import 'create_task_screen.dart';
+import 'lockscreen_config_screen.dart';
+import 'lock_screen.dart';
 import '../widgets/task_card.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -16,15 +19,18 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   List<AutoTask> _tasks = [];
+  List<TaskHistory> _history = [];
   bool _isAccessibilityEnabled = true;
   static const platform = MethodChannel('com.helloworld.autoflow/automation');
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _loadTasks();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadData();
     _checkPermissions();
   }
 
@@ -47,10 +53,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _loadTasks() async {
+  Future<void> _loadData() async {
     final tasks = await widget.isar.autoTasks.where().sortByScheduledTimeDesc().findAll();
+    final history = await widget.isar.taskHistorys.where().sortByExecutedAtDesc().findAll();
     setState(() {
       _tasks = tasks;
+      _history = history;
     });
   }
 
@@ -70,10 +78,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
-              // Settings screen stub
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LockScreen(
+                    child: const LockscreenConfigScreen(),
+                  ),
+                ),
+              );
             },
           )
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppTheme.primaryBlue,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: AppTheme.primaryBlue,
+          tabs: const [
+            Tab(text: 'Upcoming Tasks'),
+            Tab(text: 'History Logs'),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -99,40 +124,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           Expanded(
-            child: _tasks.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.auto_awesome, size: 64, color: AppTheme.primaryBlue.withOpacity(0.5)),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No tasks scheduled',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppTheme.textLight,
-                                fontWeight: FontWeight.w500,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // TASKS TAB
+                _tasks.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.auto_awesome, size: 64, color: AppTheme.primaryBlue.withOpacity(0.5)),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No tasks scheduled',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: AppTheme.textLight,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tap + to create a new automation.',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ).animate().fade(duration: 500.ms).scale(curve: Curves.easeOutBack),
+                      )
+                    : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        itemCount: _tasks.length,
+                        itemBuilder: (context, index) {
+                          final task = _tasks[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: TaskCard(task: task, isar: widget.isar, onRefresh: _loadData),
+                          ).animate().fade(duration: 400.ms, delay: (50 * index).ms).slideY(begin: 0.1, end: 0);
+                        },
+                      ),
+                
+                // HISTORY TAB
+                _history.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No history available yet.',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _history.length,
+                        itemBuilder: (context, index) {
+                          final log = _history[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            color: AppTheme.cardWhite,
+                            elevation: 2,
+                            shadowColor: Colors.black12,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            child: ListTile(
+                              leading: Icon(
+                                log.success ? Icons.check_circle : Icons.error,
+                                color: log.success ? Colors.green : Colors.red,
                               ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tap + to create a new automation.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ).animate().fade(duration: 500.ms).scale(curve: Curves.easeOutBack),
-                  )
-                : ListView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                    itemCount: _tasks.length,
-                    itemBuilder: (context, index) {
-                      final task = _tasks[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: TaskCard(task: task, isar: widget.isar, onRefresh: _loadTasks),
-                      ).animate().fade(duration: 400.ms, delay: (50 * index).ms).slideY(begin: 0.1, end: 0);
-                    },
-                  ),
+                              title: Text(log.taskTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(
+                                log.success ? 'Executed Successfully' : (log.errorMessage ?? 'Failed'),
+                                style: TextStyle(color: log.success ? Colors.green : Colors.red),
+                              ),
+                              trailing: Text(
+                                "\${log.executedAt.hour}:\${log.executedAt.minute.toString().padLeft(2, '0')}\\n\${log.executedAt.day}/\${log.executedAt.month}",
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ),
+                          ).animate().fade().slideY(begin: 0.1, end: 0);
+                        },
+                      ),
+              ],
+            ),
           ),
         ],
       ),
@@ -147,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               builder: (context) => CreateTaskScreen(isar: widget.isar),
             ),
           );
-          _loadTasks();
+          _loadData();
         },
       ).animate().scale(delay: 300.ms),
     );
