@@ -14,6 +14,14 @@ import android.app.KeyguardManager
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.Typeface
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.TextView
 import org.json.JSONObject
 import org.json.JSONArray
 
@@ -114,8 +122,8 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             Log.d(TAG, "Device is locked. Starting SKEDit style unlock sequence...")
             performUnlockSequence()
         } else {
-            Log.d(TAG, "Device is unlocked. Proceeding directly to app.")
-            launchTargetApp()
+            Log.d(TAG, "Device is unlocked. Proceeding to countdown.")
+            showCountdownAndLaunch()
         }
     }
     
@@ -177,7 +185,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                     clickNodeByText("OK")
                     clickNodeByText("Done")
                     Handler(Looper.getMainLooper()).postDelayed({
-                        launchTargetApp()
+                        showCountdownAndLaunch()
                     }, 1000)
                 }, 500)
                 return
@@ -197,9 +205,76 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             clickNodeByText("OK")
             
             Handler(Looper.getMainLooper()).postDelayed({
-                launchTargetApp()
+                showCountdownAndLaunch()
             }, 1000)
         }, delay + 300)
+    }
+    
+    private var overlayView: View? = null
+
+    private fun showCountdownAndLaunch() {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                    PixelFormat.TRANSLUCENT
+                )
+                
+                val layout = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setBackgroundColor(Color.parseColor("#E6000000")) // 90% black
+                }
+                
+                val textTitle = TextView(this).apply {
+                    text = "Automation Starting..."
+                    textSize = 32f
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER
+                }
+                
+                val textCountdown = TextView(this).apply {
+                    text = "5"
+                    textSize = 120f
+                    setTextColor(Color.parseColor("#4A90E2")) // Blue
+                    gravity = Gravity.CENTER
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 40, 0, 0)
+                }
+                
+                layout.addView(textTitle)
+                layout.addView(textCountdown)
+                
+                wm.addView(layout, params)
+                overlayView = layout
+                
+                var count = 5
+                val handler = Handler(Looper.getMainLooper())
+                val runnable = object : Runnable {
+                    override fun run() {
+                        count--
+                        if (count > 0) {
+                            textCountdown.text = count.toString()
+                            handler.postDelayed(this, 1000)
+                        } else {
+                            try {
+                                wm.removeView(layout)
+                                overlayView = null
+                            } catch (e: Exception) {}
+                            launchTargetApp()
+                        }
+                    }
+                }
+                handler.postDelayed(runnable, 1000)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error showing countdown: ", e)
+                launchTargetApp()
+            }
+        }
     }
     
     private fun clickNodeByText(text: String): Boolean {

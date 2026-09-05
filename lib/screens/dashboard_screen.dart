@@ -266,8 +266,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         backgroundColor: AppTheme.primaryBlue,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('New Task', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        onPressed: () {
-          PlatformSelectorSheet.show(context, widget.isar);
+        onPressed: () async {
+          final String? platformType = await PlatformSelectorSheet.show(context, widget.isar);
+          if (platformType != null && mounted) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateTaskScreen(isar: widget.isar, platformType: platformType),
+              ),
+            );
+            _loadData();
+          }
         },
       ).animate().scale(delay: 300.ms),
     );
