@@ -76,7 +76,7 @@ class _LockscreenConfigScreenState extends State<LockscreenConfigScreen> {
             const SizedBox(height: 8),
             TextField(
               controller: _pinController,
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.visiblePassword,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: 'Enter your phone lock PIN',

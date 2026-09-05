@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/auto_task.dart';
 import '../models/history_model.dart';
 import '../theme/app_theme.dart';
 import 'create_task_screen.dart';
+import 'onboarding_screen.dart';
 import 'lockscreen_config_screen.dart';
 import 'lock_screen.dart';
 import '../widgets/task_card.dart';
@@ -22,7 +24,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   List<AutoTask> _tasks = [];
   List<TaskHistory> _history = [];
-  bool _isAccessibilityEnabled = true;
+  bool _allPermissionsGranted = true;
   static const platform = MethodChannel('com.helloworld.autoflow/automation');
   late TabController _tabController;
 
@@ -36,9 +38,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _checkPermissions() async {
     try {
-      final bool isEnabled = await platform.invokeMethod('checkAccessibilityPermission');
+      final bool isAccessibility = await platform.invokeMethod('checkAccessibilityPermission');
+      final bool isOverlay = await Permission.systemAlertWindow.isGranted;
+      final bool isContacts = await Permission.contacts.isGranted;
+      final bool isBattery = await Permission.ignoreBatteryOptimizations.isGranted;
+      
       setState(() {
-        _isAccessibilityEnabled = isEnabled;
+        _allPermissionsGranted = isAccessibility && isOverlay && isContacts && isBattery;
       });
     } catch (e) {
       print("Error checking permissions: \$e");
@@ -64,6 +70,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    if (!_allPermissionsGranted) {
+      return OnboardingScreen(
+        onFinished: _checkPermissions,
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundWhite,
       appBar: AppBar(
@@ -75,6 +87,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.security_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OnboardingScreen(onFinished: () {
+                    Navigator.pop(context);
+                    _checkPermissions();
+                  }),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
@@ -102,27 +128,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
       body: Column(
         children: [
-          if (!_isAccessibilityEnabled)
-            Container(
-              color: Colors.amber.shade100,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Accessibility permission is required for background automation.',
-                      style: TextStyle(fontSize: 13, color: Colors.black87),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _requestPermission,
-                    child: const Text('ENABLE'),
-                  )
-                ],
-              ),
-            ),
           Expanded(
             child: TabBarView(
               controller: _tabController,

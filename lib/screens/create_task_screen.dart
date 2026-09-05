@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../models/auto_task.dart';
 import '../theme/app_theme.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class CreateTaskScreen extends StatefulWidget {
   final Isar isar;
   const CreateTaskScreen({super.key, required this.isar});
@@ -15,7 +17,7 @@ class CreateTaskScreen extends StatefulWidget {
   State<CreateTaskScreen> createState() => _CreateTaskScreenState();
 }
 
-class _CreateTaskScreenState extends State<CreateTaskScreen> {
+class _CreateTaskScreenState extends State<CreateTaskScreen> with WidgetsBindingObserver {
   final _titleController = TextEditingController();
   final _targetController = TextEditingController();
   final _payloadController = TextEditingController();
@@ -23,6 +25,39 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   DateTime _scheduledDate = DateTime.now();
   TimeOfDay _scheduledTime = TimeOfDay.now().replacing(minute: TimeOfDay.now().minute + 5 > 59 ? 59 : TimeOfDay.now().minute + 5);
   bool _isRecurring = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _titleController.dispose();
+    _targetController.dispose();
+    _payloadController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPickedContact();
+    }
+  }
+
+  Future<void> _checkPickedContact() async {
+    final prefs = await SharedPreferences.getInstance();
+    final picked = prefs.getString('flutter_contact_picked');
+    if (picked != null && picked.isNotEmpty) {
+      setState(() {
+        _targetController.text = picked;
+      });
+      await prefs.remove('flutter_contact_picked');
+    }
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
@@ -146,17 +181,25 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
               const SizedBox(height: 8),
               InkWell(
                 onTap: () async {
-                  try {
-                    if (await Permission.contacts.request().isGranted) {
-                      final Contact? contact = await FlutterContacts.native.showPicker();
-                      if (contact != null) {
-                        setState(() {
-                          _targetController.text = contact.displayName ?? '';
-                        });
+                  if (_selectedType == 'whatsapp' || _selectedType == 'instagram') {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('flutter_start_pick_contact', _selectedType);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Opening \$_selectedType... Tap any contact to select it!')),
+                    );
+                  } else {
+                    try {
+                      if (await Permission.contacts.request().isGranted) {
+                        final Contact? contact = await FlutterContacts.native.showPicker();
+                        if (contact != null) {
+                          setState(() {
+                            _targetController.text = contact.displayName ?? '';
+                          });
+                        }
                       }
+                    } catch (e) {
+                      print('Error picking contact: \$e');
                     }
-                  } catch (e) {
-                    print('Error picking contact: \$e');
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -172,7 +215,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _targetController.text.isEmpty ? 'Select Recipient from Contacts' : _targetController.text,
+                          _targetController.text.isEmpty ? 'Select Recipient' : _targetController.text,
                           style: TextStyle(
                             fontSize: 16,
                             color: _targetController.text.isEmpty ? Colors.grey.shade500 : Colors.black87,

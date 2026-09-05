@@ -33,6 +33,8 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
     private var messagePayload = ""
     private var automationStep = 0
     private var macroActionsJson = ""
+    private var isPickingContact = false
+    private var pickingPlatform = ""
     
     // Wake Lock
     private var wakeLock: PowerManager.WakeLock? = null
@@ -72,6 +74,30 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                     startAutomationSequence()
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to parse automation payload", e)
+                }
+            }
+        }
+        
+        if (key == "flutter_start_pick_contact") {
+            val payload = sharedPreferences?.getString(key, null)
+            if (payload != null && payload.isNotEmpty()) {
+                isPickingContact = true
+                pickingPlatform = payload
+                sharedPreferences.edit().remove(key).apply()
+                Log.d(TAG, "Starting contact picker for \$payload")
+                
+                var packageName = ""
+                when (payload) {
+                    "whatsapp" -> packageName = "com.whatsapp"
+                    "instagram" -> packageName = "com.instagram.android"
+                }
+                
+                if (packageName.isNotEmpty()) {
+                    val intent = packageManager.getLaunchIntentForPackage(packageName)
+                    if (intent != null) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    }
                 }
             }
         }
@@ -195,7 +221,15 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event == null) return
+
+        if (isPickingContact && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            val node = event.source ?: return
+            extractContactNameFromNode(node)
+            return
+        }
+
         if (!isAutomating) return
         val rootNode = rootInActiveWindow ?: return
 
@@ -247,6 +281,39 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                     automationStep = 6
                     finishAutomation()
                 }
+            }
+            }
+        }
+    }
+
+    private fun extractContactNameFromNode(node: AccessibilityNodeInfo) {
+        var contactName = node.text?.toString()
+        if (contactName.isNullOrEmpty()) {
+            contactName = node.contentDescription?.toString()
+        }
+        
+        if (contactName.isNullOrEmpty()) {
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i)
+                if (child != null) {
+                    val childText = child.text?.toString()
+                    if (!childText.isNullOrEmpty()) {
+                        contactName = childText
+                        break
+                    }
+                }
+            }
+        }
+        
+        if (!contactName.isNullOrEmpty()) {
+            Log.d(TAG, "Contact picked: \$contactName")
+            isPickingContact = false
+            prefs.edit().putString("flutter_contact_picked", contactName).apply()
+            
+            val intent = packageManager.getLaunchIntentForPackage("com.helloworld.autoflow.autoflow")
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                startActivity(intent)
             }
         }
     }
