@@ -251,9 +251,10 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                 // A new screen just opened in the target app - read the title
                 Handler(Looper.getMainLooper()).postDelayed({
+                    if (!isPickingContact) return@postDelayed
                     val root = rootInActiveWindow ?: return@postDelayed
                     tryExtractFromConversationHeader(root, pkg)
-                }, 300) // small delay so the screen fully renders
+                }, 400) // small delay so the screen fully renders
                 return
             }
 
@@ -296,10 +297,13 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                 "com.whatsapp:id/conversation_contact_name"
             )
             "com.instagram.android" -> listOf(
-                "com.instagram.android:id/direct_thread_title_type"
+                "com.instagram.android:id/header_subtitle",
+                "com.instagram.android:id/direct_thread_title_type",
+                "com.instagram.android:id/title"
             )
             "com.snapchat.android" -> listOf(
-                "com.snapchat.android:id/chat_input_bar_title"
+                "com.snapchat.android:id/chat_input_bar_title",
+                "com.snapchat.android:id/chat_header_title"
             )
             else -> emptyList()
         }
@@ -307,7 +311,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         for (id in titleIds) {
             val nodes = root.findAccessibilityNodeInfosByViewId(id)
             for (node in nodes) {
-                val text = node.text?.toString()
+                val text = (node.text ?: node.contentDescription)?.toString()
                 if (!text.isNullOrEmpty() && !isBadKeyword(text)) {
                     Log.d(TAG, "[Header] Contact from conversation header ID ($id): $text")
                     return sendContactBack(text)
