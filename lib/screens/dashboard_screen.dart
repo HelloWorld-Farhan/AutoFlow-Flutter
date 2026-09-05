@@ -11,6 +11,7 @@ import 'onboarding_screen.dart';
 import 'lockscreen_config_screen.dart';
 import 'lock_screen.dart';
 import '../widgets/task_card.dart';
+import '../widgets/platform_selector_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Isar isar;
@@ -231,14 +232,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         backgroundColor: AppTheme.primaryBlue,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('New Task', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CreateTaskScreen(isar: widget.isar),
-            ),
-          );
-          _loadData();
+        onPressed: () {
+          PlatformSelectorSheet.show(context, widget.isar);
         },
       ).animate().scale(delay: 300.ms),
     );
