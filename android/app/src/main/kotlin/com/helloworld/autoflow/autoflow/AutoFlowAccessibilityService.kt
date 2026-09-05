@@ -298,8 +298,7 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             )
             "com.instagram.android" -> listOf(
                 "com.instagram.android:id/header_subtitle",
-                "com.instagram.android:id/direct_thread_title_type",
-                "com.instagram.android:id/title"
+                "com.instagram.android:id/direct_thread_title_type"
             )
             "com.snapchat.android" -> listOf(
                 "com.snapchat.android:id/chat_input_bar_title",
@@ -340,10 +339,6 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             val node = queue.poll() ?: continue
             val cls = node.className?.toString() ?: ""
             if (cls.contains("EditText")) return true
-            val text = (node.text ?: node.contentDescription)?.toString()?.lowercase() ?: ""
-            if (text.contains("message") || text.contains("send") || text.contains("type a") || text.contains("chat")) {
-                return true
-            }
             for (i in 0 until node.childCount) {
                 node.getChild(i)?.let { queue.add(it) }
             }
