@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:contacts_service/contacts_service.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/auto_task.dart';
 import '../theme/app_theme.dart';
@@ -123,11 +123,11 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             InkWell(
               onTap: () async {
                 try {
-                  if (await Permission.contacts.request().isGranted) {
-                    final Contact? contact = await ContactsService.openDeviceContactPicker();
+                  if (await FlutterContacts.requestPermission()) {
+                    final Contact? contact = await FlutterContacts.openExternalPick();
                     if (contact != null) {
                       setState(() {
-                        _targetController.text = contact.displayName ?? '';
+                        _targetController.text = contact.displayName;
                       });
                     }
                   }
