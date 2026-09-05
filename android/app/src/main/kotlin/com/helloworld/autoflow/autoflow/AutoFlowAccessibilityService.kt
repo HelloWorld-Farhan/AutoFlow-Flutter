@@ -245,8 +245,9 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
 
         if (isPickingContact && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val node = event.source ?: return
-            extractContactNameFromNode(node)
-            return
+            if (extractContactNameFromNode(node)) {
+                return
+            }
         }
 
         if (!isAutomating) return
@@ -304,27 +305,35 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
         }
     }
 
-    private fun extractContactNameFromNode(node: AccessibilityNodeInfo) {
-        var contactName = node.text?.toString()
-        if (contactName.isNullOrEmpty()) {
-            contactName = node.contentDescription?.toString()
+    private fun extractContactNameFromNode(node: AccessibilityNodeInfo): Boolean {
+        val className = node.className?.toString() ?: ""
+        if (className.contains("EditText") || className.contains("ImageView") || className.contains("ImageButton") || className.contains("Button")) {
+            return false 
         }
+
+        var contactName: String? = null
         
-        if (contactName.isNullOrEmpty()) {
-            for (i in 0 until node.childCount) {
-                val child = node.getChild(i)
-                if (child != null) {
-                    val childText = child.text?.toString()
-                    if (!childText.isNullOrEmpty()) {
-                        contactName = childText
-                        break
-                    }
-                }
+        val knownIds = listOf(
+            "com.whatsapp:id/conversations_row_contact_name",
+            "com.whatsapp:id/contactpicker_row_name",
+            "com.instagram.android:id/row_search_user_username",
+            "com.instagram.android:id/row_inbox_username",
+            "com.snapchat.android:id/feed_display_name"
+        )
+        for (id in knownIds) {
+            val nodes = node.findAccessibilityNodeInfosByViewId(id)
+            if (nodes.isNotEmpty() && !nodes[0].text.isNullOrEmpty()) {
+                contactName = nodes[0].text.toString()
+                break
             }
         }
         
+        if (contactName == null && (className.contains("Layout") || className.contains("ViewGroup"))) {
+            contactName = extractTextRecursively(node)
+        }
+        
         if (!contactName.isNullOrEmpty()) {
-            Log.d(TAG, "Contact picked: \$contactName")
+            Log.d(TAG, "Contact picked: $contactName")
             isPickingContact = false
             prefs.edit().putString("flutter.flutter_contact_picked", contactName).apply()
             
@@ -333,7 +342,25 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 startActivity(intent)
             }
+            return true
         }
+        return false
+    }
+
+    private fun extractTextRecursively(node: AccessibilityNodeInfo?): String? {
+        if (node == null) return null
+        val cls = node.className?.toString() ?: ""
+        if (cls.contains("ImageView") || cls.contains("ImageButton")) return null
+        
+        val text = node.text?.toString()
+        if (!text.isNullOrEmpty() && text.length > 1 && !text.matches(Regex(".*\\d{1,2}:\\d{2}.*"))) {
+            return text
+        }
+        for (i in 0 until node.childCount) {
+            val childText = extractTextRecursively(node.getChild(i))
+            if (childText != null) return childText
+        }
+        return null
     }
 
     private fun handleInstagramAutomation(rootNode: AccessibilityNodeInfo) {
