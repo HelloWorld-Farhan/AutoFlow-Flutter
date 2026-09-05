@@ -243,9 +243,28 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
-        if (isPickingContact && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            val root = rootInActiveWindow ?: return
-            if (extractContactNameFromScreen(root)) {
+        if (isPickingContact) {
+            val pkg = event.packageName?.toString() ?: ""
+            val isTargetApp = pkg == "com.whatsapp" || pkg == "com.instagram.android" || pkg == "com.snapchat.android"
+
+            // Primary strategy: detect navigation into a conversation/chat screen
+            if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                // A new screen just opened in the target app - read the title
+                Handler(Looper.getMainLooper()).postDelayed({
+                    val root = rootInActiveWindow ?: return@postDelayed
+                    if (tryExtractFromConversationHeader(root, pkg)) {
+                        return@postDelayed
+                    }
+                    // Fallback: scan entire screen on window change
+                    extractContactNameFromScreen(root)
+                }, 300) // small delay so the screen fully renders
+                return
+            }
+
+            // Fallback: also catch clicks in case user is on a search result
+            if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                val root = rootInActiveWindow ?: return
+                extractContactNameFromScreen(root)
                 return
             }
         }
@@ -259,6 +278,41 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             "snapchat" -> handleSnapchatAutomation(rootNode)
         }
     }
+
+    private fun tryExtractFromConversationHeader(root: AccessibilityNodeInfo, pkg: String): Boolean {
+        // Platform-specific title bar IDs for the conversation/chat open screen
+        val titleIds = when (pkg) {
+            "com.whatsapp" -> listOf(
+                "com.whatsapp:id/conversation_contact_name",
+                "com.whatsapp:id/toolbar_title",
+                "com.whatsapp:id/contact_name"
+            )
+            "com.instagram.android" -> listOf(
+                "com.instagram.android:id/action_bar_title",
+                "com.instagram.android:id/direct_thread_title_type",
+                "com.instagram.android:id/row_inbox_username"
+            )
+            "com.snapchat.android" -> listOf(
+                "com.snapchat.android:id/chat_input_bar_title",
+                "com.snapchat.android:id/action_bar_title",
+                "com.snapchat.android:id/feed_display_name"
+            )
+            else -> emptyList()
+        }
+
+        for (id in titleIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            for (node in nodes) {
+                val text = node.text?.toString()
+                if (!text.isNullOrEmpty() && !isBadKeyword(text)) {
+                    Log.d(TAG, "[Header] Contact from conversation header: $text")
+                    return sendContactBack(text)
+                }
+            }
+        }
+        return false
+    }
+
     
     private fun handleWhatsAppAutomation(rootNode: AccessibilityNodeInfo) {
         when (automationStep) {
