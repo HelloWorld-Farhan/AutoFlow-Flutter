@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">AutoFlow needs this permission to automate UI actions like sending messages in other apps when scheduled.</string>
+</resources>

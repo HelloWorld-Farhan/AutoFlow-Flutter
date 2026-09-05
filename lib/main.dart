@@ -32,7 +32,20 @@ void callbackDispatcher() {
           final autoTask = await isar.autoTasks.get(taskId);
           if (autoTask != null) {
             print("Executing task: ${autoTask.title}");
-            // TODO: Call native MethodChannel for actual device automation
+            
+            // Trigger the native Accessibility Service via MethodChannel
+            if (autoTask.taskType == 'whatsapp' && autoTask.target != null && autoTask.payload != null) {
+              const platform = MethodChannel('com.helloworld.autoflow/automation');
+              try {
+                await platform.invokeMethod('executeWhatsAppAutomation', {
+                  'contact': autoTask.target,
+                  'message': autoTask.payload,
+                });
+                print("Triggered Native WhatsApp Automation");
+              } catch (e) {
+                print("Failed to trigger native automation: \$e");
+              }
+            }
             
             // Mark as completed
             await isar.writeTxn(() async {
