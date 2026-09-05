@@ -556,7 +556,10 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                     if (clickNode(dmIcon[0])) automationStep = 2
                     return
                 }
-                val dmFallback = getAllNodes(rootNode).find { it.contentDescription?.contains("Messaging", ignoreCase = true) == true || it.contentDescription?.contains("Direct", ignoreCase = true) == true }
+                val dmFallback = getAllNodes(rootNode).find { 
+                    val cd = it.contentDescription?.toString() ?: ""
+                    cd.contains("Message", ignoreCase = true) || cd.contains("Direct", ignoreCase = true) 
+                }
                 if (dmFallback != null) {
                     if (clickNode(dmFallback)) automationStep = 2
                 }
