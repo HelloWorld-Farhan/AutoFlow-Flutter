@@ -250,10 +250,15 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
             // Primary strategy: catch clicks on contact rows (e.g., search results or home screen)
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                 val node = event.source ?: return
-                // Check if the node they clicked or its parent has a valid name
-                var name = getFirstMeaningfulText(node)
-                if (name == null && node.parent != null) {
-                    name = getFirstMeaningfulText(node.parent)
+                // Walk up to 4 levels to find the text (in case they tapped a nested profile picture)
+                var currentNode: AccessibilityNodeInfo? = node
+                var name: String? = null
+                var depth = 0
+                while (currentNode != null && depth < 4) {
+                    name = getFirstMeaningfulText(currentNode)
+                    if (name != null) break
+                    currentNode = currentNode.parent
+                    depth++
                 }
                 
                 if (name != null) {
