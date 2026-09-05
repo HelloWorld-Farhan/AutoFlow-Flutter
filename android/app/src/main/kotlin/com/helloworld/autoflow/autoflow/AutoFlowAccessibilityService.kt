@@ -549,64 +549,110 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
     }
 
     private fun handleInstagramAutomation(rootNode: AccessibilityNodeInfo) {
+        val targetName = targetContactName ?: return
+        val msg = scheduledMessage ?: return
+
+        Log.d("AutoFlowAccessibility", "Instagram step: $automationStep")
+
         when (automationStep) {
             1 -> {
-                val dmIcon = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_button")
+                // Find Inbox button (Phone or Tablet)
+                val dmIcon = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_button") + 
+                             rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/direct_tab")
+                
                 if (dmIcon.isNotEmpty()) {
-                    if (clickNode(dmIcon[0])) automationStep = 2
+                    Log.d("AutoFlowAccessibility", "Found dmIcon by ID")
+                    if (clickNode(dmIcon[0])) {
+                        Log.d("AutoFlowAccessibility", "Clicked dmIcon, moving to step 2")
+                        automationStep = 2
+                    }
                     return
                 }
+                
+                // Fallback: search for Message or Direct
                 val dmFallback = getAllNodes(rootNode).find { 
                     val cd = it.contentDescription?.toString() ?: ""
-                    cd.contains("Message", ignoreCase = true) || cd.contains("Direct", ignoreCase = true) 
+                    (cd.equals("Message", ignoreCase = true) || cd.equals("Messaging", ignoreCase = true) || cd.equals("Direct", ignoreCase = true))
                 }
+                
                 if (dmFallback != null) {
-                    if (clickNode(dmFallback)) automationStep = 2
-                }
-            }
-            2 -> {
-                val editTexts = getAllNodes(rootNode).filter { it.className?.contains("EditText") == true }
-                if (editTexts.isNotEmpty()) {
-                    val arguments = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetContact) }
-                    editTexts[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
-                    automationStep = 3
-                } else {
-                     val searchBtns = getAllNodes(rootNode).filter { it.text?.contains("Search", ignoreCase=true) == true || it.contentDescription?.contains("Search", ignoreCase=true) == true }
-                     if (searchBtns.isNotEmpty()) {
-                         clickNode(searchBtns[0])
-                     }
-                }
-            }
-            3 -> {
-                val contactNodes = rootNode.findAccessibilityNodeInfosByText(targetContact)
-                if (contactNodes.isNotEmpty()) {
-                    // Try to avoid clicking the search bar text we just entered
-                    val validContact = contactNodes.find { !(it.className?.contains("EditText") ?: false) }
-                    if (validContact != null && clickNode(validContact)) {
-                        automationStep = 4
+                    Log.d("AutoFlowAccessibility", "Found dmFallback by content desc")
+                    if (clickNode(dmFallback)) {
+                        Log.d("AutoFlowAccessibility", "Clicked dmFallback, moving to step 2")
+                        automationStep = 2
                     }
                 }
             }
+            2 -> {
+                // We are in the inbox, need to click search.
+                val searchEdit = getAllNodes(rootNode).find { it.className?.contains("EditText") == true }
+                if (searchEdit != null) {
+                    Log.d("AutoFlowAccessibility", "Found search EditText, clicking it")
+                    if (clickNode(searchEdit)) {
+                        automationStep = 3
+                    }
+                    return
+                }
+                
+                // Fallback search button in Inbox
+                val searchBtns = getAllNodes(rootNode).filter { 
+                    (it.text?.contains("Search", ignoreCase=true) == true || it.contentDescription?.contains("Search", ignoreCase=true) == true) &&
+                    it.contentDescription?.toString()?.contains("Search and explore", ignoreCase=true) != true
+                }
+                if (searchBtns.isNotEmpty()) {
+                    Log.d("AutoFlowAccessibility", "Found search button fallback")
+                    if (clickNode(searchBtns.first())) {
+                        automationStep = 3
+                    }
+                }
+            }
+            3 -> {
+                // Type the name in the search box
+                val searchBox = getAllNodes(rootNode).find { it.className?.contains("EditText") == true }
+                if (searchBox != null) {
+                    Log.d("AutoFlowAccessibility", "Typing target name: $targetName")
+                    val args = Bundle()
+                    args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetName)
+                    searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    automationStep = 4
+                }
+            }
             4 -> {
-                val editTexts = getAllNodes(rootNode).filter { it.className?.contains("EditText") == true }
-                if (editTexts.isNotEmpty()) {
-                    val arguments = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, messagePayload) }
-                    editTexts[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
-                    automationStep = 5
+                // Click the user from search results
+                val userNode = getAllNodes(rootNode).find { it.text?.toString()?.equals(targetName, ignoreCase=true) == true || it.contentDescription?.toString()?.equals(targetName, ignoreCase=true) == true }
+                if (userNode != null) {
+                    Log.d("AutoFlowAccessibility", "Found user node in search results, clicking")
+                    if (clickNode(userNode)) {
+                        automationStep = 5
+                    }
                 }
             }
             5 -> {
-                val sendBtns = getAllNodes(rootNode).filter { it.text?.toString()?.equals("Send", ignoreCase=true) == true || it.contentDescription?.toString()?.equals("Send", ignoreCase=true) == true }
-                if (sendBtns.isNotEmpty()) {
-                    if (clickNode(sendBtns[0])) {
-                        automationStep = 6
+                // Type message in chat
+                val msgBox = getAllNodes(rootNode).find { it.className?.contains("EditText") == true }
+                if (msgBox != null) {
+                    Log.d("AutoFlowAccessibility", "Typing message")
+                    val args = Bundle()
+                    args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, msg)
+                    msgBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    automationStep = 6
+                }
+            }
+            6 -> {
+                // Click Send
+                val sendBtn = getAllNodes(rootNode).find { it.text?.toString()?.equals("Send", ignoreCase=true) == true || it.contentDescription?.toString()?.equals("Send", ignoreCase=true) == true }
+                if (sendBtn != null) {
+                    Log.d("AutoFlowAccessibility", "Clicking Send button")
+                    if (clickNode(sendBtn)) {
+                        Log.d("AutoFlowAccessibility", "Message Sent successfully")
+                        automationStep = 0
                         finishAutomation()
                     }
                 } else {
                      val sendIcon = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/row_thread_composer_button_send")
                      if (sendIcon.isNotEmpty()) {
                          clickNode(sendIcon[0])
-                         automationStep = 6
+                         automationStep = 0
                          finishAutomation()
                      }
                 }
