@@ -280,8 +280,6 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                     sendButton[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
                     automationStep = 6
                     finishAutomation()
-                }
-            }
             }
         }
     }
