@@ -261,8 +261,16 @@ class AutoFlowAccessibilityService : AccessibilityService(), SharedPreferences.O
                 return
             }
 
-            // Fallback: also catch clicks in case user is on a search result
+            // Fallback: catch clicks on contact rows (e.g., search results)
             if (isTargetApp && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                val node = event.source
+                if (node != null) {
+                    val name = getFirstMeaningfulText(node)
+                    if (name != null) {
+                        Log.d(TAG, "[Strategy3] Contact from clicked node: $name")
+                        if (sendContactBack(name)) return
+                    }
+                }
                 val root = rootInActiveWindow ?: return
                 extractContactNameFromScreen(root)
                 return
